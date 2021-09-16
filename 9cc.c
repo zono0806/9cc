@@ -14,8 +14,8 @@ typedef enum{
 typedef struct Token Token;
 
 struct Token{
-	TokenKind kind; //トークンの型
-	Token *next; //次の入力トークン
+	TokenKind kind; //type of token
+	Token *next; //next token
 	int val;
 	char *str;
 };
@@ -30,7 +30,7 @@ void error(char *fmt, ...){
 	exit(1);
 }
 
-//次のトークンが期待している記号の時は、真を返す。それ以外は偽を返す。
+//if the next token is expected token, this function returns true, else false.
 bool consume(char op){
 	if (token->kind != TK_RESERVED || token->str[0] != op)
 		return false;
@@ -38,17 +38,17 @@ bool consume(char op){
 	return true;
 }
 
-//次のトークンが期待した文字のとき、トークンを一つ読み進める。
+//if the next token is expected token, read one more token.
 void expect(char op){
 	if (token->kind != TK_RESERVED || token->str[0] != op)
-		error("'%c'ではありません", op);
+		error("This is not '%c'", op);
 	token = token->next;
 }
 
-//次のトークンが数値の場合、トークンを一つ読み進め数値を返す。
+//if the next token is number, reads one more token and returns the number.
 int expect_number(){
 	if(token->kind != TK_NUM)
-		error("数ではありません");
+		error("This is not number.");
 	int val = token->val;
 	token = token->next;
 	return val;
@@ -59,7 +59,7 @@ bool at_eof(){
 }
 
 
-//新しいトークンを作成してcurに捧げる
+//generate new token and pass to cur
 Token *new_token(TokenKind kind, Token *cur, char *str){
 	Token *tok = calloc(1, sizeof(Token));
 	tok->kind = kind;
@@ -90,7 +90,7 @@ Token *tokenize(char *p){
 			continue;
 		}
 
-		error("トークナイズできません");
+		perror("can not tokenize.");
 	}
 
 	new_token(TK_EOF, cur, p);
