@@ -23,5 +23,8 @@ try 10 '1+2+3+4'
 try 10 '3*3+1'
 try 36 '(4+8) * 3'
 try 3  '(10 + 2 ) / (50 - 46) '
+# TEST: unary operator
+try 15 '+3*(8-3)'
+try 0  '-10+( 2 * 5)'
 echo OK
 

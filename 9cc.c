@@ -174,6 +174,7 @@ Token *tokenize(){
 
   Node *expr();
   Node *mul();
+  Node *unary();
   Node *primary();
 
 
@@ -191,19 +192,30 @@ Token *tokenize(){
     }
   }
        	   
-  // mul = primary("*" primary | "-" primary)*
+  // mul = unary("*" unary | "-" unary)*
   Node *mul(){
-    Node *node = primary();
+    Node *node = unary();
 
     for(;;){
       if(consume('*'))
-	node = new_binary(NO_MUL, node, primary());
+	node = new_binary(NO_MUL, node, unary());
       else if(consume('/'))
-	node = new_binary(NO_DIV, node, primary());
+	node = new_binary(NO_DIV, node, unary());
       else
 	return node;
     }
 
+  }
+
+
+  // unary = ( "+" | "-" )? | primary
+  Node *unary(){
+    if(consume('+'))
+      return primary();
+    if(consume('-'))
+      return new_binary(NO_SUB, new_num(0), primary());
+    return primary();
+    
   }
 
 
@@ -217,7 +229,6 @@ Token *tokenize(){
 
     return new_num(expect_number());
   }
-
 
 
 
