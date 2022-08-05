@@ -19,9 +19,10 @@ typedef struct Token Token;
 
 struct Token{
   TokenKind kind; //type of token
-  Token *next; //next token
-  int val;
-  char *str;
+  Token *next;    //next token
+  int val;        //Token value  
+  char *str;      //token
+  int len;        //the length of token
 };
 
 //current token
@@ -55,8 +56,8 @@ void error(char *fmt, ...){
 }
 
 //if the next token is expected token, this function returns true, else false.
-bool consume(char op){
-  if (token->kind != TK_RESERVED || token->str[0] != op)
+bool consume(char *op){
+  if (token->kind != TK_RESERVED || strlen(op) != token->len || memcmp(token->str, op, token->len))
     return false;
   token = token->next;
   return true;
@@ -64,18 +65,18 @@ bool consume(char op){
 
 //if the next token is expected token, read one more token.
 void expect(char op){
-	if (token->kind != TK_RESERVED || token->str[0] != op)
+  if (token->kind != TK_RESERVED || strlen(op) != token->len || memcmp(token->str, op, token->len))
 		error_at(token->str, "expectd '%c'", op);
-	token = token->next;
+  token = token->next;
 }
 
 //if the next token is number, reads one more token and returns the number.
 int expect_number(){
   if(token->kind != TK_NUM)
     error_at(token->str, "Not a number");
-    int val = token->val;
-    token = token->next;
-    return val;
+  int val = token->val;
+  token = token->next;
+  return val;
 }
 
 bool at_eof(){
@@ -84,15 +85,23 @@ bool at_eof(){
 
 
 //generate new token and pass to cur
-Token *new_token(TokenKind kind, Token *cur, char *str){
+Token *new_token(TokenKind kind, Token *cur, char *str, int len){
   //printf("str: %s\n ", str);
   Token *tok = calloc(1, sizeof(Token));
   tok->kind = kind;
   tok->str = str;
+  tok->len = len;
   cur->next = tok;
   // return cur->nextと同じ動作をするのか？
   return tok;
 }
+
+
+bool startswith(char *p, char *q){
+  return memcmp(p, q, strlen(q)) == 0;
+
+}
+
 
 // トークンに分解
 Token *tokenize(){
@@ -111,23 +120,30 @@ Token *tokenize(){
       continue;
     }
 
-    // if + or - or * or /
-    if(strchr("()+-*/", *p)){
-      cur = new_token(TK_RESERVED, cur, p++);
+    if(startswith(p, "==") || startswith(p, "!=") || startswith(p, "<=") || startswith(p, ">=")){
+      cur = new_token(TK_RESERVED, cur, p, 2);
+      p += 2;
+      continue;
+    }
+
+    if(strchr("+-*/()<>", *p)) {
+      cur = new_token(TK_RESERVED, cur, p++, 2);
       continue;
     }
     
     // strtol function proceed the p to next letter so we do not need p++.
     if(isdigit(*p)){
-      cur = new_token(TK_NUM, cur, p);
+      cur = new_token(TK_NUM, cur, p, 0);
+      char *q = p;
       cur->val = strtol(p, &p, 10);
+      cur->len = p - q;
       continue;
     }
 
     error_at(p,"invalid token...");
   }
 
-  new_token(TK_EOF, cur, p);
+  new_token(TK_EOF, cur, p, 0);
   return head.next;
 }
 
@@ -141,6 +157,10 @@ Token *tokenize(){
 	       NO_MUL,
 	       NO_DIV,
 	       NO_NUM,
+	       NO_EQ,
+	       NO_NE,
+	       NO_LT,
+	       NO_LE,
   }NodeKind;
 
   typedef struct Node Node;
@@ -173,33 +193,88 @@ Token *tokenize(){
   }
 
   Node *expr();
+  Node *equality();
+  Node *relational();
+  Node *add();
   Node *mul();
   Node *unary();
   Node *primary();
 
 
-  // expr = mul("+" mul | "-" mul)*
+// BNF
+// expr       = equality
+// equality   = relational ("==" relational | "!=" relational)*
+// relational = add ("<" | "<=" add | ">" add | ">=" add)* 
+// add        = mul ( "+" mul | "-" mul)*
+// mul        = unary ( "*" unary | "/" unary )*
+// unary      = ( "+" | "-" )? primary
+// primary    = num | "(" expr ")"
+
+
+  // expr = equality
   Node *expr(){
-    Node *node = mul();
+    return equality();
+  }
+
+  //equality = relational("==" relational | "!=" relational)*;
+  Node *equality(){
+    Node *node = relational();
 
     for(;;){
-      if(consume('+'))
-	 node = new_binary(NO_ADD, node, mul());
-      else if(consume('-'))
-         node = new_binary(NO_SUB , node, mul());
+      if(consume("=="))
+	node = new_binary(NO_EQ, node, relational());
+      else if(consume("!="))
+	node = new_binary(NO_NE, node, relational());
       else
 	return node;
     }
   }
-       	   
-  // mul = unary("*" unary | "-" unary)*
+
+  //relational = add("<" add | "<=" add | ">" add | ">=" add)
+  Node *relational(){
+    Node *node = add();
+
+    for(;;){
+      if(consume("<"))
+	node = new_binary(NO_LT, node, add());
+      else if(consume("<="))
+	node = new_binary(NO_LE, node, add());
+      else if(consume(">"))
+	node = new_binary(NO_LT, add(), node);
+      else if(consume(">="))
+	node = new_binary(NO_LE, add(), node);
+      else
+	return node;
+    }
+
+    
+  }
+
+  // add = mul ( "+" mul | "-" mul)*
+  Node *add(){
+    Node *node = mul();
+
+    for(;;){
+	if(consume("+"))
+	  node = new_binary(NO_ADD, node, mul());
+	else if(consume("-"))
+	  node = new_binary(NO_SUB, node, mul());
+	else
+	  return node;
+    }
+
+  }
+
+    
+  
+  // mul = unary("*" unary | "/" unary)*
   Node *mul(){
     Node *node = unary();
 
     for(;;){
-      if(consume('*'))
+      if(consume("*"))
 	node = new_binary(NO_MUL, node, unary());
-      else if(consume('/'))
+      else if(consume("/"))
 	node = new_binary(NO_DIV, node, unary());
       else
 	return node;
@@ -208,12 +283,12 @@ Token *tokenize(){
   }
 
 
-  // unary = ( "+" | "-" )? | primary
+  // unary = ( "+" | "-" )? | unary
   Node *unary(){
-    if(consume('+'))
-      return primary();
-    if(consume('-'))
-      return new_binary(NO_SUB, new_num(0), primary());
+    if(consume("+"))
+      return unary();
+    if(consume("-"))
+      return new_binary(NO_SUB, new_num(0), unary());
     return primary();
     
   }
@@ -221,9 +296,9 @@ Token *tokenize(){
 
   // primary = num | "(" expr ")"
   Node *primary(){
-    if(consume('(')){
+    if(consume("(")){
       Node *node = expr();
-      expect(')');
+      expect(")");
       return node;
     }
 
@@ -261,6 +336,27 @@ Token *tokenize(){
       printf("    cqo\n");
       printf("    idiv rdi\n");
       break;
+    case NO_EQ:
+      printf("    cmp rax, rdi\n");
+      printf("    sete al\n");
+      printf("    movzb rax, al\n");
+      break;
+    case NO_NE:
+      printf("    cmp rax, rdi\n");
+      printf("    setne al\n");
+      printf("    movzb rax, al\n");
+      break;
+    case NO_LT:
+      printf("    cmp rax, rdi\n");
+      printf("    setl al\n");
+      printf("    movzb rax, al\n");
+      break;
+    case NO_LE:
+      printf("    cmp rax, rdi\n");
+      printf("    setle al\n");
+      printf("    movzb rax, al\n");
+      break;
+
     }
 
     printf("    push rax\n");
