@@ -66,7 +66,7 @@ bool consume(char *op){
 //if the next token is expected token, read one more token.
 void expect(char op){
   if (token->kind != TK_RESERVED || strlen(op) != token->len || memcmp(token->str, op, token->len))
-		error_at(token->str, "expectd '%c'", op);
+    error_at(token->str, "expectd '%c'", op);
   token = token->next;
 }
 
@@ -127,7 +127,7 @@ Token *tokenize(){
     }
 
     if(strchr("+-*/()<>", *p)) {
-      cur = new_token(TK_RESERVED, cur, p++, 2);
+      cur = new_token(TK_RESERVED, cur, p++, 1);
       continue;
     }
     
