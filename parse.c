@@ -1,5 +1,8 @@
 #include "9cc.h"
 
+Node *code[100];
+
+// 新しいNodeの作成
 Node *new_node(NodeKind kind){
   Node *node = calloc(1, sizeof(Node));
   node->kind = kind;
@@ -14,12 +17,16 @@ Node *new_binary(NodeKind kind, Node *lhs, Node *rhs){
 
 }
 
+// NUMのノードを作り、引数の値を代入する。
 Node *new_num(int val){
   Node *node = new_node(NO_NUM);
   node->val = val;
   return node;
 }
 
+Node *program();
+Node *stmt();
+Node *assign();
 Node *expr();
 Node *equality();
 Node *relational();
@@ -30,18 +37,56 @@ Node *primary();
 
 
 // BNF
-// expr       = equality
+// program    = stmt
+// stmt       = expr ";"
+// expr       = assign
+// assign     = equality ("=" assign)?
 // equality   = relational ("==" relational | "!=" relational)*
-// relational = add ("<" | "<=" add | ">" add | ">=" add)* 
+// relational = add ("<" add | "<=" add | ">" add | ">=" add)* 
 // add        = mul ( "+" mul | "-" mul)*
 // mul        = unary ( "*" unary | "/" unary )*
 // unary      = ( "+" | "-" )? primary
-// primary    = num | "(" expr ")"
+// primary    = num | ident | "(" expr ")"
 
+
+// program = stmt;
+Node *program(){
+  //int i = 0;
+  Node head;
+  head.next = NULL;
+  Node *cur = &head;
+
+  while(!at_eof()){
+    cur->next = stmt();
+    cur = cur -> next;
+  }
+
+  return head.next;
+  
+  //while(!at_eof()){
+  //code[i++] = stmt();
+  //}
+  //code[i] = NULL;
+}
+
+// stmt = expr ";"
+Node *stmt(){
+  Node *node = expr();
+  expect(";");
+  return node;
+}
 
 // expr = equality
 Node *expr(){
-  return equality();
+  return assign();
+}
+
+// assign = equality ( "=" assign)?
+Node *assign(){
+  Node *node = equality();
+  if(consume("="))
+    return node = new_binary(NO_ASSIGN, node, assign());
+  return node;
 }
 
 //equality = relational("==" relational | "!=" relational)*;
@@ -122,5 +167,6 @@ Node *primary(){
     expect(")");
     return node;
   }
+  // 数字はここでノードになる
   return new_num(expect_number());
 }
